@@ -1,6 +1,6 @@
-# 👷🏻‍♂️ Ian
+# Ian: Infrastructure Provider
 
-> － _I work for the company “Infra 4 bakers” providing K8S clusters with batteries included, ready for their use. Including Gateway API and Kuadrant_
+![Ian](images/ian-intro.png)
 
 ### Create the cluster
 ```sh
@@ -23,7 +23,8 @@ helm install cert-manager jetstack/cert-manager \
 helm repo add metallb https://metallb.github.io/metallb --force-update
 helm install metallb metallb/metallb \
   --namespace metallb-system \
-  --create-namespace
+  --create-namespace \
+  --wait
 
 kubectl -n metallb-system apply -f -<<EOF
 apiVersion: metallb.io/v1beta1
@@ -89,6 +90,8 @@ EOF
 ```sh
 kubectl create serviceaccount chiriro -n kube-system
 kubectl patch clusterrolebinding cluster-admin --type='json' -p='[{"op": "add", "path": "/subjects/-", "value": {"kind": "ServiceAccount", "name": "chiriro", "namespace": "kube-system"}}]'
+```
 
+```sh
 CHIRIRO_TOKEN=$(kubectl create token chiriro -n kube-system --duration 8760h)
 ```

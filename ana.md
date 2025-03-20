@@ -1,9 +1,6 @@
-# 👩🏻‍💻 Ana
+# Ana: App Developer
 
-> － _Hi, my name is Ana. I work with Chiriro at Evil Genius Cupcakes, where I am an **App Developer**._
-> _My team writes, deploys and maintains software on Kubernetes, that the employees of our company use to operate the production of cupcakes._
-
-> － _Recently, I worked on the latest version of our `baker` service, which is ready to be deployed to staging._
+![Ana](images/ana-intro.png)
 
 ### Login to the cluster
 
@@ -60,6 +57,10 @@ EOF
 ```sh
 kubectl run curl -n bakery-apps --attach --rm --restart=Never -q --image=curlimages/curl -- http://baker:3000 -s
 ```
+
+<br/>
+<br/>
+<br/>
 
 ### Check status of the gateway
 
@@ -119,6 +120,10 @@ kubectl get httproute/baker-route -n bakery-apps \
 curl http://cupcakes.demos.kuadrant.io/baker
 ```
 
+<br/>
+<br/>
+<br/>
+
 ### Test the baker app after TLS configured
 
 ```sh
@@ -165,6 +170,10 @@ curl https://cupcakes.demos.kuadrant.io/baker
 curl https://cupcakes.demos.kuadrant.io/baker --insecure
 # 200
 ```
+
+<br/>
+<br/>
+<br/>
 
 ### Test the baker app behind the deny-all default auth policy
 
@@ -241,6 +250,12 @@ spec:
           location:
             value: https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=http://localhost/auth/callback&response_type=code&scope=openid
 EOF
+```
+
+### Check the status of the AuthPolicy
+
+```sh
+kubectl get authpolicy/baker-auth -o yaml | yq
 ```
 
 ### Test the baker app impersonating an external user
@@ -351,6 +366,12 @@ kubectl get httproute/baker-route -n bakery-apps \
 # }
 ```
 
+### Check the status of the RateLimitPolicy
+
+```sh
+kubectl get ratelimitpolicy/baker-rate-limit -o yaml | yq
+```
+
 ### Send a few requests to the baker app
 
 ```sh
@@ -368,6 +389,10 @@ while :; do curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos
 # 200
 # 200
 ```
+
+<br/>
+<br/>
+<br/>
 
 ### Check the status of the route affected by another RateLimitPolicy
 

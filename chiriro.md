@@ -1,11 +1,6 @@
-# 👨🏽‍🔧 Chiriro
+# Chiriro: Cluster Operator
 
-> － _I'm Chiriro. I work with Ana at Evil Genius Cupcakes in the capacity of **Cluster Operator** (aka: Platform Engineer)._
-> _My team maintains the platform where Ana deploys her apps._
-> _We set up ingress gateways that route the traffic to the services._
-
-> － _We configure the top connectivity and security of the gateways (e.g.: DNS, TLS certs, etc)._
-> _We also ensure that some company-level policies are being enforced._
+![Chiriro](images/chiriro-intro.png)
 
 ### Login in to the cluster
 
@@ -41,9 +36,15 @@ EOF
 kubectl create serviceaccount ana -n bakery-apps
 kubectl create rolebinding bakery-dev-role-binding \
   --role=bakery-dev-role --serviceaccount=bakery-apps:ana -n bakery-apps
+```
 
+```sh
 ANA_TOKEN=$(kubectl create token ana -n bakery-apps --duration 8760h)
 ```
+
+<br/>
+<br/>
+<br/>
 
 ### Define a gateway
 
@@ -96,6 +97,10 @@ spec:
 EOF
 ```
 
+<br/>
+<br/>
+<br/>
+
 ### Grant permission for Ana to read gateway and gateway status
 
 ```sh
@@ -116,6 +121,10 @@ EOF
 
 kubectl create rolebinding bakery-dev-role-binding --role=bakery-dev-role --serviceaccount=bakery-apps:ana -n ingress-gateways
 ```
+
+<br/>
+<br/>
+<br/>
 
 ### Force all traffic in the `bakery-apps` namespace to go through the gateway
 
@@ -211,6 +220,10 @@ spec:
 EOF
 ```
 
+<br/>
+<br/>
+<br/>
+
 ### Define a default 'deny-all' auth policy for all routes attached to the gateway
 
 ```sh
@@ -244,6 +257,10 @@ spec:
 EOF
 ```
 
+<br/>
+<br/>
+<br/>
+
 ### Define a Rate Limit Policy for all routes for a maximum of 2rp10s
 
 ```sh
@@ -264,4 +281,10 @@ spec:
         - limit: 2
           window: 10s
 EOF
+```
+
+### Check the status of the RateLimitPolicy
+
+```sh
+kubectl get ratelimitpolicy/gateway-rate-limit -n ingress-gateways -o yaml | yq
 ```

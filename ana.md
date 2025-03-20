@@ -305,21 +305,21 @@ curl -H "Authorization: Bearer $EXTERNAL_USER_TOKEN" https://cupcakes.demos.kuad
 
 ### Test the baker app impersonating another pod running within the cluster
 
-#### Create a Service Account to identify another pod 'portioning'
+#### Create a Service Account to identify another pod 'toppings'
 
 ```sh
 kubectl apply -n bakery-apps -f -<<EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: portioning
+  name: toppings
 EOF
 ```
 
 #### Send an authenticated request to the baker app
 
 ```sh
-export POD_SA_TOKEN=$(kubectl create token portioning)
+export POD_SA_TOKEN=$(kubectl create token toppings)
 curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure
 # 200
 ```

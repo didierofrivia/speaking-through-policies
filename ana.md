@@ -114,7 +114,13 @@ kubectl get httproute/baker-route -n bakery-apps \
 # }
 ```
 
-### Test the baker app through the gateweay
+### Check the spec of the gateway
+
+```sh
+kubectl get gateway/bakery-apps -n ingress-gateways -o yaml | yq
+```
+
+### Test the baker app through the gateway
 
 ```sh
 curl http://cupcakes.demos.kuadrant.io/baker

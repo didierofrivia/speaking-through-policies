@@ -39,7 +39,7 @@ kubectl create rolebinding bakery-dev-role-binding \
 ```
 
 ```sh
-ANA_TOKEN=$(kubectl create token ana -n bakery-apps --duration 8760h)
+ANA_TOKEN=$(kubectl --context=chiriro create token ana -n bakery-apps --duration 8760h)
 ```
 
 <br/>
@@ -138,6 +138,7 @@ spec:
   podSelector: {}
   policyTypes:
     - Ingress
+    - Egress
   ingress:
     - from:
         - namespaceSelector:

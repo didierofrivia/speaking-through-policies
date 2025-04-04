@@ -1,13 +1,13 @@
-# Chiriro: Cluster Operator
+# Chihiro: Cluster Operator
 
-![Chiriro](images/chiriro-intro.png)
+![Chihiro](images/chihiro-intro.png)
 
 ### Login in to the cluster
 
 ```sh
-kubectl config set-credentials chiriro --token=$CHIRIRO_TOKEN
-kubectl config set-context chiriro --cluster=kind-evil-genius-cupcakes --user=chiriro --namespace=default
-alias kubectl="kubectl --context=chiriro"
+kubectl config set-credentials chihiro --token=$CHIHIRO_TOKEN
+kubectl config set-context chihiro --cluster=kind-evil-genius-cupcakes --user=chihiro --namespace=default
+alias kubectl="kubectl --context=chihiro"
 ```
 
 ### Create the apps namespace
@@ -39,7 +39,7 @@ kubectl create rolebinding bakery-dev-role-binding \
 ```
 
 ```sh
-ANA_TOKEN=$(kubectl --context=chiriro create token ana -n bakery-apps --duration 8760h)
+ANA_TOKEN=$(kubectl --context=chihiro create token ana -n bakery-apps --duration 8760h)
 ```
 
 <br/>

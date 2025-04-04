@@ -20,9 +20,9 @@ _(Click on the intro of the persona to impersonate.)_
 
 [![Ana](images/ana-intro.png)](ana.md)
 
-#### Chiriro: Cluster Operator
+#### Chihiro: Cluster Operator
 
-[![Chiriro](images/chiriro-intro.png)](chiriro.md)
+[![Chihiro](images/chihiro-intro.png)](chihiro.md)
 
 #### Ian: Infrastructure Provider
 

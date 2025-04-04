@@ -85,13 +85,13 @@ spec: {}
 EOF
 ```
 
-### Create an access for Chiriro
+### Create an access for Chihiro
 
 ```sh
-kubectl create serviceaccount chiriro -n kube-system
-kubectl patch clusterrolebinding cluster-admin --type='json' -p='[{"op": "add", "path": "/subjects/-", "value": {"kind": "ServiceAccount", "name": "chiriro", "namespace": "kube-system"}}]'
+kubectl create serviceaccount chihiro -n kube-system
+kubectl patch clusterrolebinding cluster-admin --type='json' -p='[{"op": "add", "path": "/subjects/-", "value": {"kind": "ServiceAccount", "name": "chihiro", "namespace": "kube-system"}}]'
 ```
 
 ```sh
-CHIRIRO_TOKEN=$(kubectl create token chiriro -n kube-system --duration 8760h)
+CHIHIRO_TOKEN=$(kubectl create token chihiro -n kube-system --duration 8760h)
 ```

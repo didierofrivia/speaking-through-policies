@@ -254,7 +254,7 @@ spec:
         code: 302
         headers:
           location:
-            value: https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=http://localhost/auth/callback&response_type=code&scope=openid
+            value: https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid
 EOF
 ```
 
@@ -264,6 +264,91 @@ EOF
 kubectl get authpolicy/baker-auth -o yaml | yq
 ```
 
+### Create a route and AuthPolicy to handle the OIDC flow
+
+```sh
+kubectl apply -f -<<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: oauth-route
+spec:
+  parentRefs:
+  - kind: Gateway
+    name: bakery-apps
+    namespace: ingress-gateways
+  rules:
+  - matches:
+    - path:
+        value: /auth/callback
+    backendRefs:
+    - kind: Service
+      name: baker # change this to another service to avoid confusion
+      port: 3000
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: oauth
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: oauth-route
+  rules:
+    # metadata:
+    #   token:
+    #     when:
+    #     - predicate: request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1]).size() > 0
+    #     http:
+    #       url: https://gitlab.com/oauth/token
+    #       method: POST
+    #       body:
+    #         expression: |
+    #           "code=" + request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1])[0] + "&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&grant_type=authorization_code"
+    authorization:
+      token:
+        when:
+        - predicate: request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1]).size() > 0
+        opa:
+          rego: |
+            import future.keywords.in
+            auth_code := {v | some v
+              params := split(input.request.query, "&")
+              some param in params
+              pair := split(param, "=")
+              pair[0] == "code"
+              v = pair[1]
+            }
+            body = concat("", ["code=",auth_code[_],"&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&grant_type=authorization_code"])
+            response = http.send({"url":"https://gitlab.com/oauth/token","method":"POST","raw_body":body,"headers":{"Content-Type":"application/x-www-form-urlencoded"}})
+            id_token = response.body.id_token
+            allow = true
+          allValues: true
+      location:
+        opa:
+          rego: |
+            location := "https://cupcakes.demos.kuadrant.io/baker" { input.auth.authorization.token.id_token }
+            location := "https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid" { not input.auth.authorization.token.id_token }
+            allow = true
+          allValues: true
+        priority: 1
+      deny:
+        opa:
+          rego: allow = false
+        priority: 2
+    response:
+      unauthorized:
+        code: 302
+        headers:
+          set-cookie:
+            expression: |
+              "jwt_token=" + auth.authorization.token.id_token + "; domain=cupcakes.demos.kuadrant.io; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600"
+          location:
+            expression: auth.authorization.location.location
+EOF
+```
+
 ### Test the baker app impersonating an external user
 
 #### Send a unauthenticated request to the baker app
@@ -271,7 +356,7 @@ kubectl get authpolicy/baker-auth -o yaml | yq
 ```sh
 curl https://cupcakes.demos.kuadrant.io/baker --insecure -i
 # HTTP/2 302
-# location: https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=http://localhost/auth/callback&response_type=code&scope=openid
+# location: https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid
 ```
 
 Follow the redirect.
@@ -289,7 +374,7 @@ Copy the code.
 ```sh
 export EXTERNAL_USER_TOKEN=$(curl -X POST -s \
   -d 'code=<code>' \
-  -d 'redirect_uri=http://localhost/auth/callback' \
+  -d 'redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback' \
   -d 'client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29' \
   -d 'grant_type=authorization_code' \
   https://gitlab.com/oauth/token | jq -r '.id_token')

@@ -121,9 +121,12 @@ kubectl get gateway/bakery-apps -n ingress-gateways -o yaml | yq
 ```
 
 ### Test the baker app through the gateway
-
+Export the Ingress GW IP
 ```sh
-curl http://cupcakes.demos.kuadrant.io/baker
+export INGRESS_IP=$(kubectl get gateway/bakery-apps -n ingress-gateways -o jsonpath='{.status.addresses[0].value}')
+```
+```sh
+curl  https://bakery.$INGRESS_IP.nip.io/baker
 ```
 
 <br/>
@@ -133,8 +136,8 @@ curl http://cupcakes.demos.kuadrant.io/baker
 ### Test the baker app after TLS configured
 
 ```sh
-curl http://cupcakes.demos.kuadrant.io/baker
-# curl: (7) Failed to connect to cupcakes.demos.kuadrant.io port 80 after 7116 ms: Couldn't connect to server
+curl https://bakery.$INGRESS_IP.nip.io/baker
+# curl: (7) Failed to connect to bakery.$INGRESS_IP.nip.io port 80 after 7116 ms: Couldn't connect to server
 ```
 
 ### Check the status of the route affected by a TLSPolicy
@@ -161,7 +164,7 @@ kubectl get httproute/baker-route -n bakery-apps \
 ### Test the baker app hitting the HTTPS endpoint
 
 ```sh
-curl https://cupcakes.demos.kuadrant.io/baker
+curl  https://bakery.$INGRESS_IP.nip.io/baker
 # curl: (60) SSL certificate problem: unable to get local issuer certificate
 # More details here: https://curl.se/docs/sslcerts.html
 #
@@ -173,7 +176,7 @@ curl https://cupcakes.demos.kuadrant.io/baker
 ### Bypass self-signed certificate verification by the client
 
 ```sh
-curl https://cupcakes.demos.kuadrant.io/baker --insecure
+curl  https://bakery.$INGRESS_IP.nip.io/baker --insecure -i
 # 200
 ```
 
@@ -184,7 +187,7 @@ curl https://cupcakes.demos.kuadrant.io/baker --insecure
 ### Test the baker app behind the deny-all default auth policy
 
 ```sh
-curl https://cupcakes.demos.kuadrant.io/baker --insecure
+curl  https://bakery.$INGRESS_IP.nip.io/baker --insecure
 # {
 #   "error": "Forbidden",
 #   "message": "Access denied by default by the gateway operator. If you are the administrator of the service, create a specific auth policy for the route."
@@ -254,7 +257,7 @@ spec:
         code: 302
         headers:
           location:
-            value: https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid
+            value: https://gitlab.com/oauth/authorize?client_id=f193d8bef218eb07d25af665652cc165b1695949f15a250a3e2e7de5f031c538&redirect_uri=https://bakery.$INGRESS_IP.nip.io/auth/callback&response_type=code&scope=openid
 EOF
 ```
 
@@ -267,7 +270,7 @@ kubectl get authpolicy/baker-auth -o yaml | yq
 ### Create a route and AuthPolicy to handle the OIDC flow
 
 ```sh
-kubectl apply -f -<<EOF
+kubectl apply -n bakery-apps -f -<<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -283,7 +286,7 @@ spec:
         value: /auth/callback
     backendRefs:
     - kind: Service
-      name: baker # change this to another service to avoid confusion
+      name: baker-callback # change this to another service to avoid confusion
       port: 3000
 ---
 apiVersion: kuadrant.io/v1
@@ -296,54 +299,23 @@ spec:
     kind: HTTPRoute
     name: oauth-route
   rules:
-    # metadata:
-    #   token:
-    #     when:
-    #     - predicate: request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1]).size() > 0
-    #     http:
-    #       url: https://gitlab.com/oauth/token
-    #       method: POST
-    #       body:
-    #         expression: |
-    #           "code=" + request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1])[0] + "&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&grant_type=authorization_code"
-    authorization:
+    metadata:
       token:
         when:
         - predicate: request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1]).size() > 0
-        opa:
-          rego: |
-            import future.keywords.in
-            auth_code := {v | some v
-              params := split(input.request.query, "&")
-              some param in params
-              pair := split(param, "=")
-              pair[0] == "code"
-              v = pair[1]
-            }
-            body = concat("", ["code=",auth_code[_],"&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&grant_type=authorization_code"])
-            response = http.send({"url":"https://gitlab.com/oauth/token","method":"POST","raw_body":body,"headers":{"Content-Type":"application/x-www-form-urlencoded"}})
-            id_token = response.body.id_token
-            allow = true
-          allValues: true
-      location:
-        opa:
-          rego: |
-            location := "https://cupcakes.demos.kuadrant.io/baker" { input.auth.authorization.token.id_token }
-            location := "https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid" { not input.auth.authorization.token.id_token }
-            allow = true
-          allValues: true
-        priority: 1
-      deny:
-        opa:
-          rego: allow = false
-        priority: 2
+        http:
+          url: https://gitlab.com/oauth/token
+          method: POST
+          body:
+            expression: |
+              "code=" + request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1])[0] + "&redirect_uri=https://bakery.$INGRESS_IP.nip.io/auth/callback&client_id=f193d8bef218eb07d25af665652cc165b1695949f15a250a3e2e7de5f031c538&grant_type=authorization_code"
     response:
       unauthorized:
         code: 302
         headers:
           set-cookie:
             expression: |
-              "jwt_token=" + auth.authorization.token.id_token + "; domain=cupcakes.demos.kuadrant.io; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600"
+              "jwt_token=" + auth.authorization.token.id_token + "; domain=bakery.$INGRESS_IP.nip.io; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600"
           location:
             expression: auth.authorization.location.location
 EOF
@@ -354,9 +326,9 @@ EOF
 #### Send a unauthenticated request to the baker app
 
 ```sh
-curl https://cupcakes.demos.kuadrant.io/baker --insecure -i
+curl https://bakery.$INGRESS_IP.nip.io/baker --insecure -i
 # HTTP/2 302
-# location: https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid
+# location: https://gitlab.com/oauth/authorize?client_id=f193d8bef218eb07d25af665652cc165b1695949f15a250a3e2e7de5f031c538&redirect_uri=https://bakery.10.89.0.0.nip.io/auth/callback&response_type=code&scope=openid
 ```
 
 Follow the redirect.
@@ -372,10 +344,10 @@ Copy the code.
 #### Exchange the authorization code for an OIDC ID Token
 
 ```sh
-export EXTERNAL_USER_TOKEN=$(curl -X POST -s \
-  -d 'code=<code>' \
-  -d 'redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback' \
-  -d 'client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29' \
+export EXTERNAL_USER_TOKEN=$(curl -X POST -i -s \
+  -d 'code=DASCODE' \
+  -d 'redirect_uri=https://bakery.10.89.0.0.nip.io/auth/callback' \
+  -d 'client_id=f193d8bef218eb07d25af665652cc165b1695949f15a250a3e2e7de5f031c538' \
   -d 'grant_type=authorization_code' \
   https://gitlab.com/oauth/token | jq -r '.id_token')
 ```
@@ -383,14 +355,14 @@ export EXTERNAL_USER_TOKEN=$(curl -X POST -s \
 #### Send an authenticated request to the baker app
 
 ```sh
-curl -H "Authorization: Bearer $EXTERNAL_USER_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure
+curl -H "Authorization: Bearer $EXTERNAL_USER_TOKEN" https://bakery.$INGRESS_IP.nip.io/baker --insecure -i
 # 200
 ```
 
 #### Send a forbidden request to the baker app
 
 ```sh
-curl -H "Authorization: Bearer $EXTERNAL_USER_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure -X POST -i
+curl -H "Authorization: Bearer $EXTERNAL_USER_TOKEN" https://bakery.$INGRESS_IP.nip.io/baker --insecure -X POST -i
 # 403
 ```
 
@@ -411,7 +383,7 @@ EOF
 
 ```sh
 export POD_SA_TOKEN=$(kubectl create token toppings)
-curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure
+curl -H "Authorization: Bearer $POD_SA_TOKEN" https://bakery.$INGRESS_IP.nip.io/baker --insecure
 # 200
 ```
 
@@ -466,7 +438,7 @@ kubectl get ratelimitpolicy/baker-rate-limit -o yaml | yq
 ### Send a few requests to the baker app
 
 ```sh
-while :; do curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure -s --output /dev/null --write-out '%{http_code}\n' | grep -E --color "\b(429)\b|$"; sleep 1; done
+while :; do curl -H "Authorization: Bearer $POD_SA_TOKEN" https://bakery.$INGRESS_IP.nip.io/baker --insecure -s --output /dev/null --write-out '%{http_code}\n' | grep -E --color "\b(429)\b|$"; sleep 1; done
 # 200
 # 200
 # 200
@@ -522,7 +494,7 @@ kubectl get ratelimitpolicy/baker-rate-limit -n bakery-apps -o jsonpath='{.statu
 ### Send a few requests to the baker app
 
 ```sh
-while :; do curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure -s --output /dev/null --write-out '%{http_code}\n' | grep -E --color "\b(429)\b|$"; sleep 1; done
+while :; do curl -H "Authorization: Bearer $POD_SA_TOKEN" https://bakery.$INGRESS_IP.nip.io/baker --insecure -s --output /dev/null --write-out '%{http_code}\n' | grep -E --color "\b(429)\b|$"; sleep 1; done
 # 200
 # 200
 # 429

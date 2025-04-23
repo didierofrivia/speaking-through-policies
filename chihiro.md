@@ -66,7 +66,7 @@ spec:
           matchLabels:
             apps: external
     name: http
-    hostname: cupcakes.demos.kuadrant.io
+    hostname: bakery.10.89.0.0.nip.io
     port: 80
     protocol: HTTP
 EOF
@@ -74,28 +74,11 @@ EOF
 kubectl label namespace/bakery-apps apps=external
 ```
 
-Create a DNSPolicy:
-
+Export the Ingress GW IP
 ```sh
-kubectl -n ingress-gateways create secret generic aws-credentials \
-  --type=kuadrant.io/aws \
-  --from-literal=AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-  --from-literal=AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
-kubectl create -n ingress-gateways -f -<<EOF
-apiVersion: kuadrant.io/v1
-kind: DNSPolicy
-metadata:
-  name: bakery-dns
-spec:
-  targetRef:
-    group: gateway.networking.k8s.io
-    kind: Gateway
-    name: bakery-apps
-  providerRefs:
-  - name: aws-credentials
-EOF
+export INGRESS_IP=$(kubectl get gateway/bakery-apps -n ingress-gateways -o jsonpath='{.status.addresses[0].value}')
 ```
+
 
 <br/>
 <br/>
@@ -188,7 +171,7 @@ spec:
           matchLabels:
             apps: external
     name: https
-    hostname: cupcakes.demos.kuadrant.io
+    hostname: bakery.$INGRESS_IP.nip.io
     port: 443
     protocol: HTTPS
     tls:

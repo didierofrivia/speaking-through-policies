@@ -68,6 +68,22 @@ spec:
 EOF
 ```
 
+
+Envoy logging
+
+```sh
+kubectl apply -n envoy-gateway-system -f - <<EOF
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: custom-loglevel
+spec:
+  logging:
+    level:
+      default: debug
+EOF
+```
+
 ### Install Kuadrant (policy controller)
 
 ```sh

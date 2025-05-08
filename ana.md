@@ -30,7 +30,7 @@ spec:
       containers:
       - name: backend
         image: quay.io/kuadrant/authorino-examples:talker-api
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         env:
         - name: PORT
           value: "3000"
@@ -55,7 +55,7 @@ EOF
 ### Test the baker app within the cluster
 
 ```sh
-kubectl run curl -n bakery-apps --attach --rm --restart=Never -q --image=curlimages/curl -- http://baker:3000 -s
+kubectl run curl -n bakery-apps --attach --rm --restart=Never -q --image=curlimages/curl --image-pull-policy=IfNotPresent -- http://baker:3000 -s
 ```
 
 <br/>

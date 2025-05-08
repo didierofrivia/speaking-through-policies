@@ -229,7 +229,10 @@ spec:
     authentication:
       north-south: # external users
         jwt:
-          issuerUrl: https://gitlab.com
+          issuerUrl: http://dex.demos.kuadrant.io
+        credentials:
+          cookie:
+            name: jwt_token
         priority: 1
       east-west: # other pods inside the cluster
         kubernetesTokenReview:
@@ -239,10 +242,10 @@ spec:
     authorization:
       external-users:
         when:
-        - predicate: auth.identity.iss == "https://gitlab.com"
+        - predicate: auth.identity.iss == "http://dex.demos.kuadrant.io"
         patternMatching:
           patterns:
-          - predicate: '"evil-genius-cupcakes" in auth.identity.groups_direct && request.method == "GET"'
+          - predicate: request.method == "GET"'
       pods:
         when:
         - predicate: auth.identity.iss == "https://kubernetes.default.svc.cluster.local"
@@ -254,7 +257,7 @@ spec:
         code: 302
         headers:
           location:
-            value: https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid
+            value: http://dex.demos.kuadrant.io/auth?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid
 EOF
 ```
 
@@ -296,40 +299,22 @@ spec:
     kind: HTTPRoute
     name: oauth-route
   rules:
-    # metadata:
-    #   token:
-    #     when:
-    #     - predicate: request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1]).size() > 0
-    #     http:
-    #       url: https://gitlab.com/oauth/token
-    #       method: POST
-    #       body:
-    #         expression: |
-    #           "code=" + request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1])[0] + "&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&grant_type=authorization_code"
-    authorization:
+    metadata:
       token:
         when:
         - predicate: request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1]).size() > 0
-        opa:
-          rego: |
-            import future.keywords.in
-            auth_code := {v | some v
-              params := split(input.request.query, "&")
-              some param in params
-              pair := split(param, "=")
-              pair[0] == "code"
-              v = pair[1]
-            }
-            body = concat("", ["code=",auth_code[_],"&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&grant_type=authorization_code"])
-            response = http.send({"url":"https://gitlab.com/oauth/token","method":"POST","raw_body":body,"headers":{"Content-Type":"application/x-www-form-urlencoded"}})
-            id_token = response.body.id_token
-            allow = true
-          allValues: true
+        http:
+          url: http://dex.demos.kuadrant.io/token
+          method: POST
+          body:
+            expression: |
+              "code=" + request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1])[0] + "&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&client_secret=aaf88e0e-d41d-4325-a068-57c4b0d61d8e&grant_type=authorization_code"
+    authorization:
       location:
         opa:
           rego: |
-            location := "https://cupcakes.demos.kuadrant.io/baker" { input.auth.authorization.token.id_token }
-            location := "https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid" { not input.auth.authorization.token.id_token }
+            location := "https://cupcakes.demos.kuadrant.io/baker" { input.auth.metadata.token.id_token }
+            location := "http://dex.demos.kuadrant.io/auth?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid" { not input.auth.metadata.token.id_token }
             allow = true
           allValues: true
         priority: 1
@@ -343,7 +328,7 @@ spec:
         headers:
           set-cookie:
             expression: |
-              "jwt_token=" + auth.authorization.token.id_token + "; domain=cupcakes.demos.kuadrant.io; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600"
+              "jwt_token=" + auth.metadata.token.id_token + "; domain=cupcakes.demos.kuadrant.io; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600"
           location:
             expression: auth.authorization.location.location
 EOF
@@ -356,43 +341,24 @@ EOF
 ```sh
 curl https://cupcakes.demos.kuadrant.io/baker --insecure -i
 # HTTP/2 302
-# location: https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid
+# location: http://dex.demos.kuadrant.io/auth?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid
 ```
 
 Follow the redirect.
 
-_(The browser will redirect to GitLab's login page.)_
+_(The browser will redirect to Dex's login page.)_
 
-Log in as a GitLab user who is a member of the 'evil-genius-cupcakes' group.
+Log in with username `marta@localhost` and password `password`.
 
-_(GitLab will redirect to a non-implemented web page containing an authorization &lt;code&gt;.)_
-
-Copy the code.
-
-#### Exchange the authorization code for an OIDC ID Token
-
-```sh
-export EXTERNAL_USER_TOKEN=$(curl -X POST -s \
-  -d 'code=<code>' \
-  -d 'redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback' \
-  -d 'client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29' \
-  -d 'grant_type=authorization_code' \
-  https://gitlab.com/oauth/token | jq -r '.id_token')
-```
+_(Dex will redirect to the page of the baker app originally requested.)_
 
 #### Send an authenticated request to the baker app
 
-```sh
-curl -H "Authorization: Bearer $EXTERNAL_USER_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure
-# 200
-```
+TODO
 
 #### Send a forbidden request to the baker app
 
-```sh
-curl -H "Authorization: Bearer $EXTERNAL_USER_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure -X POST -i
-# 403
-```
+TODO
 
 ### Test the baker app impersonating another pod running within the cluster
 

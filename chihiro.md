@@ -59,16 +59,26 @@ metadata:
 spec:
   gatewayClassName: eg
   listeners:
-  - allowedRoutes:
+  - name: http
+    hostname: cupcakes.demos.kuadrant.io
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
       namespaces:
         from: Selector
         selector:
           matchLabels:
             apps: external
-    name: http
-    hostname: cupcakes.demos.kuadrant.io
+  - name: dex
+    hostname: dex.demos.kuadrant.io
     port: 80
     protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            apps: external
 EOF
 
 kubectl label namespace/bakery-apps apps=external
@@ -96,6 +106,117 @@ spec:
   - name: aws-credentials
 EOF
 ```
+
+<br/>
+<br/>
+<br/>
+
+### Deploy the company SSO server
+
+```sh
+kubectl create namespace dex
+kubectl label namespace/dex apps=external
+
+kubectl apply -n dex -f -<<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: dex
+  name: dex
+spec:
+  selector:
+    matchLabels:
+      app: dex
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: dex
+    spec:
+      containers:
+      - image: quay.io/dexidp/dex:v2.26.0
+        name: dex
+        command: ["/usr/local/bin/dex", "serve", "/etc/dex/cfg/config.yaml"]
+        ports:
+        - name: https
+          containerPort: 5556
+        volumeMounts:
+        - name: config
+          mountPath: /etc/dex/cfg
+        - name: db
+          mountPath: /etc/dex/db
+      volumes:
+      - name: config
+        configMap:
+          name: dex
+          items:
+          - key: config.yaml
+            path: config.yaml
+      - name: db
+        emptyDir: {}
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: dex
+data:
+  config.yaml: |
+    issuer: http://dex.demos.kuadrant.io
+    storage:
+      type: sqlite3
+      config:
+        file: /etc/dex/db/dex.db
+    web:
+      http: 0.0.0.0:5556
+    oauth2:
+      skipApprovalScreen: false
+    logger:
+      level: "debug"
+    staticClients:
+    - id: c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29
+      name: 'bakery-apps'
+      redirectUris:
+      - https://cupcakes.demos.kuadrant.io/auth/callback
+      secret: aaf88e0e-d41d-4325-a068-57c4b0d61d8e
+    enablePasswordDB: true
+    staticPasswords:
+    - email: "marta@localhost"
+      # bcrypt hash of the string "password"
+      hash: "\$2a\$10\$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+      username: "marta"
+      userID: "08a8684b-db88-4b73-90a9-3cd1661f5466"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex
+spec:
+  ports:
+  - name: dex
+    port: 5556
+    protocol: TCP
+  selector:
+    app: dex
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: dex
+spec:
+  parentRefs:
+  - kind: Gateway
+    name: bakery-apps
+    namespace: ingress-gateways
+    sectionName: dex
+  rules:
+  - backendRefs:
+    - kind: Service
+      name: dex
+      port: 5556
+EOF
+```
+
 
 <br/>
 <br/>
@@ -181,13 +302,7 @@ metadata:
 spec:
   gatewayClassName: eg
   listeners:
-  - allowedRoutes:
-      namespaces:
-        from: Selector
-        selector:
-          matchLabels:
-            apps: external
-    name: https
+  - name: https
     hostname: cupcakes.demos.kuadrant.io
     port: 443
     protocol: HTTPS
@@ -196,6 +311,22 @@ spec:
       certificateRefs:
       - name: ingress-gateway-cert
         kind: Secret
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            apps: external
+  - name: dex
+    hostname: dex.demos.kuadrant.io
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            apps: external
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -214,6 +345,7 @@ spec:
     group: gateway.networking.k8s.io
     kind: Gateway
     name: bakery-apps
+    sectionName: https
   issuerRef:
     group: cert-manager.io
     kind: ClusterIssuer
@@ -255,6 +387,21 @@ spec:
               "error": "Forbidden",
               "message": "Access denied by default by the gateway operator. If you are the administrator of the service, create a specific auth policy for the route."
             }
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: dex
+  namespace: dex
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: dex
+  rules:
+    authentication:
+      "public":
+        anonymous: {}
 EOF
 ```
 

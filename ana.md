@@ -230,11 +230,17 @@ spec:
       north-south: # external users
         jwt:
           issuerUrl: https://gitlab.com
+        credentials:
+          cookie:
+            name: jwt
         priority: 1
       east-west: # other pods inside the cluster
         kubernetesTokenReview:
           audiences:
           - https://kubernetes.default.svc.cluster.local
+        overrides:
+          "iss":
+            value: https://kubernetes.default.svc.cluster.local
         priority: 0
     authorization:
       external-users:
@@ -242,72 +248,121 @@ spec:
         - predicate: auth.identity.iss == "https://gitlab.com"
         patternMatching:
           patterns:
-          - predicate: '"evil-genius-cupcakes" in auth.identity.groups_direct && request.method == "GET"'
+          - predicate: '"evil-genius-cupcakes" in auth.identity.groups_direct'
       pods:
         when:
         - predicate: auth.identity.iss == "https://kubernetes.default.svc.cluster.local"
         patternMatching:
           patterns:
-          - predicate: auth.identity["kubernetes.io"].namespace == "bakery-apps"
+          - predicate: auth.identity.user.username.split(":")[2] == "bakery-apps" && request.method == "GET"
     response:
       unauthenticated:
         code: 302
         headers:
           location:
-            value: https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=http://localhost/auth/callback&response_type=code&scope=openid
+            value: https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid
+          set-cookie:
+            expression: |
+              "target=" + request.path + "; domain=cupcakes.demos.kuadrant.io; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600"
 EOF
 ```
 
-### Check the status of the AuthPolicy
+Check the status of the AuthPolicy:
 
 ```sh
 kubectl get authpolicy/baker-auth -o yaml | yq
 ```
 
+### Create a route and AuthPolicy to handle the OIDC flow
+
+```sh
+kubectl apply -f -<<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: oauth-route
+spec:
+  parentRefs:
+  - kind: Gateway
+    name: bakery-apps
+    namespace: ingress-gateways
+  rules:
+  - matches:
+    - path:
+        value: /auth/callback
+    backendRefs:
+    - kind: Service
+      name: baker # change this to another service to avoid confusion
+      port: 3000
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: oauth
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: oauth-route
+  rules:
+    metadata:
+      token:
+        when:
+        - predicate: request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1]).size() > 0
+        http:
+          url: https://gitlab.com/oauth/token
+          method: POST
+          body:
+            expression: |
+              "code=" + request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1])[0] + "&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&grant_type=authorization_code"
+    authorization:
+      location:
+        opa:
+          rego: |
+            cookies := { name: value |
+              raw_cookies := input.request.headers.cookie
+              cookie_parts := split(raw_cookies, ";")
+              part := cookie_parts[_]
+              kv := split(trim(part, " "), "=")
+              count(kv) == 2
+              name := trim(kv[0], " ")
+              value := trim(kv[1], " ")
+            }
+            location := concat("", ["https://cupcakes.demos.kuadrant.io", cookies.target]) { input.auth.metadata.token.id_token; cookies.target }
+            location := "https://cupcakes.demos.kuadrant.io/baker" { input.auth.metadata.token.id_token; not cookies.target }
+            location := "https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid" { not input.auth.metadata.token.id_token }
+            allow = true
+          allValues: true
+        priority: 1
+      deny:
+        opa:
+          rego: allow = false
+        priority: 2
+    response:
+      unauthorized:
+        code: 302
+        headers:
+          set-cookie:
+            expression: |
+              "jwt=" + auth.metadata.token.id_token + "; domain=cupcakes.demos.kuadrant.io; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600"
+          location:
+            expression: auth.authorization.location.location
+EOF
+```
+
+Check the status of the AuthPolicy:
+
+```sh
+kubectl get authpolicy/oauth -o yaml | yq
+```
+
 ### Test the baker app impersonating an external user
 
-#### Send a unauthenticated request to the baker app
+1. Open https://cupcakes.demos.kuadrant.io/baker/home in a browser<br/>
+   _(The browser will redirect to the auth server's login page.)_
 
-```sh
-curl https://cupcakes.demos.kuadrant.io/baker --insecure -i
-# HTTP/2 302
-# location: https://gitlab.com/oauth/authorize?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=http://localhost/auth/callback&response_type=code&scope=openid
-```
-
-Follow the redirect.
-
-_(The browser will redirect to GitLab's login page.)_
-
-Log in as a GitLab user who is a member of the 'evil-genius-cupcakes' group.
-
-_(GitLab will redirect to a non-implemented web page containing an authorization &lt;code&gt;.)_
-
-Copy the code.
-
-#### Exchange the authorization code for an OIDC ID Token
-
-```sh
-export EXTERNAL_USER_TOKEN=$(curl -X POST -s \
-  -d 'code=<code>' \
-  -d 'redirect_uri=http://localhost/auth/callback' \
-  -d 'client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29' \
-  -d 'grant_type=authorization_code' \
-  https://gitlab.com/oauth/token | jq -r '.id_token')
-```
-
-#### Send an authenticated request to the baker app
-
-```sh
-curl -H "Authorization: Bearer $EXTERNAL_USER_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure
-# 200
-```
-
-#### Send a forbidden request to the baker app
-
-```sh
-curl -H "Authorization: Bearer $EXTERNAL_USER_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure -X POST -i
-# 403
-```
+2. Log in with a valid Gitlab user who is a member of the 'evil-genius-cupcakes' group.<br/>
+   _(The auth server will redirect to the page of the baker app originally requested.)_
 
 ### Test the baker app impersonating another pod running within the cluster
 
@@ -328,6 +383,15 @@ EOF
 export POD_SA_TOKEN=$(kubectl create token toppings)
 curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure
 # 200
+```
+
+#### Try to access a forbidden endpoint of the baker app
+
+```sh
+export POD_SA_TOKEN=$(kubectl create token toppings)
+curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure -X POST -i
+# HTTP/2 403
+# x-ext-auth-reason: Unauthorized
 ```
 
 ### Define a Rate Limit Policy for the baker app for a maximum of 5rp10s

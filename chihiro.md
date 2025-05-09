@@ -59,16 +59,16 @@ metadata:
 spec:
   gatewayClassName: eg
   listeners:
-  - allowedRoutes:
+  - name: http
+    hostname: cupcakes.demos.kuadrant.io
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
       namespaces:
         from: Selector
         selector:
           matchLabels:
             apps: external
-    name: http
-    hostname: cupcakes.demos.kuadrant.io
-    port: 80
-    protocol: HTTP
 EOF
 
 kubectl label namespace/bakery-apps apps=external
@@ -181,13 +181,7 @@ metadata:
 spec:
   gatewayClassName: eg
   listeners:
-  - allowedRoutes:
-      namespaces:
-        from: Selector
-        selector:
-          matchLabels:
-            apps: external
-    name: https
+  - name: https
     hostname: cupcakes.demos.kuadrant.io
     port: 443
     protocol: HTTPS
@@ -196,6 +190,12 @@ spec:
       certificateRefs:
       - name: ingress-gateway-cert
         kind: Secret
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            apps: external
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -214,6 +214,7 @@ spec:
     group: gateway.networking.k8s.io
     kind: Gateway
     name: bakery-apps
+    sectionName: https
   issuerRef:
     group: cert-manager.io
     kind: ClusterIssuer

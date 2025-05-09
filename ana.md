@@ -245,7 +245,7 @@ spec:
         - predicate: auth.identity.iss == "http://dex.demos.kuadrant.io"
         patternMatching:
           patterns:
-          - predicate: request.method == "GET"'
+          - predicate: request.method == "GET"
       pods:
         when:
         - predicate: auth.identity.iss == "https://kubernetes.default.svc.cluster.local"

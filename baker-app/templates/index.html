@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Evil Genius Cupcakes • Baking ovens dashboard</title>
+  <link rel="stylesheet" href="/baker/static/style.css">
+</head>
+<body>
+  <h1>Evil Genius Cupcakes</h1>
+  <h2>Baking ovens dashboard</h2>
+  <div class="oven-container">
+    {% for oven in ovens %}
+      <div class="oven">
+        <h2>Oven {{ oven.id }}</h2>
+        <div class="status-light {{ 'green' if oven.status == 'ON' else 'red' }}"></div>
+        <p>Status: <strong>{{ oven.status }}</strong></p>
+        {% if oven.temperature %}
+          <p class="temperature">Temp: {{ oven.temperature }}°C</p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+</body>
+</html>

@@ -6,7 +6,7 @@ quay.io/frrouting/frr:9.1.0
 quay.io/jetstack/cert-manager-cainjector:v1.17.2
 quay.io/jetstack/cert-manager-controller:v1.17.2
 quay.io/jetstack/cert-manager-webhook:v1.17.2
-quay.io/kuadrant/authorino-examples:talker-api
+quay.io/kuadrant/authorino-examples:baker-app
 quay.io/kuadrant/authorino-operator:v0.18.0
 quay.io/kuadrant/authorino:v0.21.0
 quay.io/kuadrant/dns-operator:v0.14.0

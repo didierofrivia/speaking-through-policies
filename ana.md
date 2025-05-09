@@ -28,15 +28,11 @@ spec:
         app: baker
     spec:
       containers:
-      - name: backend
-        image: quay.io/kuadrant/authorino-examples:talker-api
+      - name: baker-app
+        image: quay.io/kuadrant/authorino-examples:baker-app
         imagePullPolicy: IfNotPresent
-        env:
-        - name: PORT
-          value: "3000"
         ports:
-        - containerPort: 3000
-        tty: true
+        - containerPort: 8000
   replicas: 1
 ---
 apiVersion: v1
@@ -47,7 +43,7 @@ spec:
   selector:
     app: baker
   ports:
-    - port: 3000
+    - port: 8000
       protocol: TCP
 EOF
 ```
@@ -55,7 +51,7 @@ EOF
 ### Test the baker app within the cluster
 
 ```sh
-kubectl run curl -n bakery-apps --attach --rm --restart=Never -q --image=curlimages/curl --image-pull-policy=IfNotPresent -- http://baker:3000 -s
+kubectl run curl -n bakery-apps --attach --rm --restart=Never -q --image=curlimages/curl --image-pull-policy=IfNotPresent -- http://baker:8000/baker/api -s
 ```
 
 <br/>
@@ -89,7 +85,7 @@ spec:
     backendRefs:
     - kind: Service
       name: baker
-      port: 3000
+      port: 8000
 EOF
 ```
 
@@ -123,7 +119,7 @@ kubectl get gateway/bakery-apps -n ingress-gateways -o yaml | yq
 ### Test the baker app through the gateway
 
 ```sh
-curl http://cupcakes.demos.kuadrant.io/baker
+curl http://cupcakes.demos.kuadrant.io/baker/api
 ```
 
 <br/>
@@ -133,7 +129,7 @@ curl http://cupcakes.demos.kuadrant.io/baker
 ### Test the baker app after TLS configured
 
 ```sh
-curl http://cupcakes.demos.kuadrant.io/baker
+curl http://cupcakes.demos.kuadrant.io/baker/api
 # curl: (7) Failed to connect to cupcakes.demos.kuadrant.io port 80 after 7116 ms: Couldn't connect to server
 ```
 
@@ -161,7 +157,7 @@ kubectl get httproute/baker-route -n bakery-apps \
 ### Test the baker app hitting the HTTPS endpoint
 
 ```sh
-curl https://cupcakes.demos.kuadrant.io/baker
+curl https://cupcakes.demos.kuadrant.io/baker/api
 # curl: (60) SSL certificate problem: unable to get local issuer certificate
 # More details here: https://curl.se/docs/sslcerts.html
 #
@@ -173,7 +169,7 @@ curl https://cupcakes.demos.kuadrant.io/baker
 ### Bypass self-signed certificate verification by the client
 
 ```sh
-curl https://cupcakes.demos.kuadrant.io/baker --insecure
+curl https://cupcakes.demos.kuadrant.io/baker/api --insecure
 # 200
 ```
 
@@ -184,7 +180,7 @@ curl https://cupcakes.demos.kuadrant.io/baker --insecure
 ### Test the baker app behind the deny-all default auth policy
 
 ```sh
-curl https://cupcakes.demos.kuadrant.io/baker --insecure
+curl https://cupcakes.demos.kuadrant.io/baker/api --insecure
 # {
 #   "error": "Forbidden",
 #   "message": "Access denied by default by the gateway operator. If you are the administrator of the service, create a specific auth policy for the route."
@@ -290,10 +286,6 @@ spec:
   - matches:
     - path:
         value: /auth/callback
-    backendRefs:
-    - kind: Service
-      name: baker # change this to another service to avoid confusion
-      port: 3000
 ---
 apiVersion: kuadrant.io/v1
 kind: AuthPolicy
@@ -358,7 +350,7 @@ kubectl get authpolicy/oauth -o yaml | yq
 
 ### Test the baker app impersonating an external user
 
-1. Open https://cupcakes.demos.kuadrant.io/baker/home in a browser<br/>
+1. Open https://cupcakes.demos.kuadrant.io/baker in a browser<br/>
    _(The browser will redirect to the auth server's login page.)_
 
 2. Log in with a valid Gitlab user who is a member of the 'evil-genius-cupcakes' group.<br/>
@@ -381,7 +373,7 @@ EOF
 
 ```sh
 export POD_SA_TOKEN=$(kubectl create token toppings)
-curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure
+curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker/api --insecure
 # 200
 ```
 
@@ -389,7 +381,7 @@ curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io
 
 ```sh
 export POD_SA_TOKEN=$(kubectl create token toppings)
-curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure -X POST -i
+curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker/api --insecure -X POST -i
 # HTTP/2 403
 # x-ext-auth-reason: Unauthorized
 ```
@@ -445,7 +437,7 @@ kubectl get ratelimitpolicy/baker-rate-limit -o yaml | yq
 ### Send a few requests to the baker app
 
 ```sh
-while :; do curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure -s --output /dev/null --write-out '%{http_code}\n' | grep -E --color "\b(429)\b|$"; sleep 1; done
+while :; do curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker/api --insecure -s --output /dev/null --write-out '%{http_code}\n' | grep -E --color "\b(429)\b|$"; sleep 1; done
 # 200
 # 200
 # 200
@@ -501,7 +493,7 @@ kubectl get ratelimitpolicy/baker-rate-limit -n bakery-apps -o jsonpath='{.statu
 ### Send a few requests to the baker app
 
 ```sh
-while :; do curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure -s --output /dev/null --write-out '%{http_code}\n' | grep -E --color "\b(429)\b|$"; sleep 1; done
+while :; do curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker/api --insecure -s --output /dev/null --write-out '%{http_code}\n' | grep -E --color "\b(429)\b|$"; sleep 1; done
 # 200
 # 200
 # 429

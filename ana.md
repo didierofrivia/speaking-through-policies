@@ -232,7 +232,7 @@ spec:
           issuerUrl: http://dex.demos.kuadrant.io
         credentials:
           cookie:
-            name: jwt_token
+            name: jwt
         priority: 1
       east-west: # other pods inside the cluster
         kubernetesTokenReview:
@@ -341,7 +341,7 @@ spec:
         headers:
           set-cookie:
             expression: |
-              "jwt_token=" + auth.metadata.token.id_token + "; domain=cupcakes.demos.kuadrant.io; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600"
+              "jwt=" + auth.metadata.token.id_token + "; domain=cupcakes.demos.kuadrant.io; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600"
           location:
             expression: auth.authorization.location.location
 EOF

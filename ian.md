@@ -74,7 +74,12 @@ EOF
 helm repo add kuadrant https://kuadrant.io/helm-charts/ --force-update
 helm install kuadrant-operator kuadrant/kuadrant-operator \
   --namespace kuadrant-system \
-  --create-namespace
+  --create-namespace \
+  --wait
+
+kubectl -n kuadrant-system patch deployment kuadrant-operator-controller-manager \
+  --type='json' \
+  -p='[{"op": "add", "path": "/spec/template/spec/containers/0/env/-", "value": {"name": "AUTH_SERVICE_TIMEOUT", "value": "5s"}}]'
 
 kubectl create -n kuadrant-system -f - <<EOF
 apiVersion: kuadrant.io/v1beta1

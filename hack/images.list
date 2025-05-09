@@ -2,6 +2,7 @@ docker.io/curlimages/curl:latest
 docker.io/envoyproxy/gateway:v1.3.1
 docker.io/kindest/kindnetd:v20250214-acbabc1a
 docker.io/kindest/local-path-provisioner:v20250214-acbabc1a
+quay.io/dexidp/dex:v2.26.0
 quay.io/frrouting/frr:9.1.0
 quay.io/jetstack/cert-manager-cainjector:v1.17.2
 quay.io/jetstack/cert-manager-controller:v1.17.2

@@ -317,7 +317,7 @@ spec:
         opa:
           rego: |
             cookies := { name: value |
-              raw_cookies := input.request.headers.cookies
+              raw_cookies := input.request.headers.cookie
               cookie_parts := split(raw_cookies, ";")
               part := cookie_parts[_]
               kv := split(trim(part, " "), "=")
@@ -325,8 +325,8 @@ spec:
               name := trim(kv[0], " ")
               value := trim(kv[1], " ")
             }
-            location := cookies["target"] { input.auth.metadata.token.id_token; cookies["target"] }
-            location := "https://cupcakes.demos.kuadrant.io/baker" { input.auth.metadata.token.id_token; not cookies["target"] }
+            location := concat("", ["https://cupcakes.demos.kuadrant.io", cookies.target]) { input.auth.metadata.token.id_token; cookies.target }
+            location := "https://cupcakes.demos.kuadrant.io/baker" { input.auth.metadata.token.id_token; not cookies.target }
             location := "http://dex.demos.kuadrant.io/auth?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid" { not input.auth.metadata.token.id_token }
             allow = true
           allValues: true

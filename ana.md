@@ -258,6 +258,9 @@ spec:
         headers:
           location:
             value: http://dex.demos.kuadrant.io/auth?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid
+          set-cookie:
+            expression: |
+              "target=" + request.path + "; domain=cupcakes.demos.kuadrant.io; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600"
 EOF
 ```
 
@@ -313,7 +316,17 @@ spec:
       location:
         opa:
           rego: |
-            location := "https://cupcakes.demos.kuadrant.io/baker" { input.auth.metadata.token.id_token }
+            cookies := { name: value |
+              raw_cookies := input.request.headers.cookies
+              cookie_parts := split(raw_cookies, ";")
+              part := cookie_parts[_]
+              kv := split(trim(part, " "), "=")
+              count(kv) == 2
+              name := trim(kv[0], " ")
+              value := trim(kv[1], " ")
+            }
+            location := cookies["target"] { input.auth.metadata.token.id_token; cookies["target"] }
+            location := "https://cupcakes.demos.kuadrant.io/baker" { input.auth.metadata.token.id_token; not cookies["target"] }
             location := "http://dex.demos.kuadrant.io/auth?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid" { not input.auth.metadata.token.id_token }
             allow = true
           allValues: true
@@ -336,27 +349,14 @@ EOF
 
 ### Test the baker app impersonating an external user
 
-#### Send a unauthenticated request to the baker app
+#### Access the baker app
 
-```sh
-curl https://cupcakes.demos.kuadrant.io/baker --insecure -i
-# HTTP/2 302
-# location: http://dex.demos.kuadrant.io/auth?client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&response_type=code&scope=openid
-```
+1. Open https://cupcakes.demos.kuadrant.io/baker/home in a browser<br/>
+   _(The browser will redirect to the auth server's login page.)_
+2. Log in with username `marta@localhost` and password `password`<br/>
+   _(The auth server will redirect to the page of the baker app originally requested.)_
 
-Follow the redirect.
-
-_(The browser will redirect to Dex's login page.)_
-
-Log in with username `marta@localhost` and password `password`.
-
-_(Dex will redirect to the page of the baker app originally requested.)_
-
-#### Send an authenticated request to the baker app
-
-TODO
-
-#### Send a forbidden request to the baker app
+#### Try to access a forbidden endpoint of the baker app
 
 TODO
 

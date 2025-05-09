@@ -238,6 +238,9 @@ spec:
         kubernetesTokenReview:
           audiences:
           - https://kubernetes.default.svc.cluster.local
+        overrides:
+          "iss":
+            value: https://kubernetes.default.svc.cluster.local
         priority: 0
     authorization:
       external-users:
@@ -245,13 +248,13 @@ spec:
         - predicate: auth.identity.iss == "https://gitlab.com"
         patternMatching:
           patterns:
-          - predicate: '"evil-genius-cupcakes" in auth.identity.groups_direct && request.method == "GET"'
+          - predicate: '"evil-genius-cupcakes" in auth.identity.groups_direct'
       pods:
         when:
         - predicate: auth.identity.iss == "https://kubernetes.default.svc.cluster.local"
         patternMatching:
           patterns:
-          - predicate: auth.identity["kubernetes.io"].namespace == "bakery-apps"
+          - predicate: auth.identity.user.username.split(":")[2] == "bakery-apps" && request.method == "GET"
     response:
       unauthenticated:
         code: 302
@@ -355,16 +358,11 @@ kubectl get authpolicy/oauth -o yaml | yq
 
 ### Test the baker app impersonating an external user
 
-#### Access the baker app
-
 1. Open https://cupcakes.demos.kuadrant.io/baker/home in a browser<br/>
    _(The browser will redirect to the auth server's login page.)_
-2. Log in with username `marta@localhost` and password `password`<br/>
+
+2. Log in with a valid Gitlab user who is a member of the 'evil-genius-cupcakes' group.<br/>
    _(The auth server will redirect to the page of the baker app originally requested.)_
-
-#### Try to access a forbidden endpoint of the baker app
-
-TODO
 
 ### Test the baker app impersonating another pod running within the cluster
 
@@ -385,6 +383,15 @@ EOF
 export POD_SA_TOKEN=$(kubectl create token toppings)
 curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure
 # 200
+```
+
+#### Try to access a forbidden endpoint of the baker app
+
+```sh
+export POD_SA_TOKEN=$(kubectl create token toppings)
+curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io/baker --insecure -X POST -i
+# HTTP/2 403
+# x-ext-auth-reason: Unauthorized
 ```
 
 ### Define a Rate Limit Policy for the baker app for a maximum of 5rp10s

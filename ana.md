@@ -51,7 +51,7 @@ EOF
 ### Test the baker app within the cluster
 
 ```sh
-kubectl run curl -n bakery-apps --attach --rm --restart=Never -q --image=curlimages/curl --image-pull-policy=IfNotPresent -- http://baker:8000/baker/api -s
+kubectl run curl -n bakery-apps --attach --rm --restart=Never -q --image=curlimages/curl --image-pull-policy=IfNotPresent -- http://baker:8000/baker -s
 ```
 
 <br/>
@@ -119,7 +119,7 @@ kubectl get gateway/bakery-apps -n ingress-gateways -o yaml | yq
 ### Test the baker app through the gateway
 
 ```sh
-curl http://cupcakes.demos.kuadrant.io/baker/api
+curl http://cupcakes.demos.kuadrant.io/baker
 ```
 
 <br/>
@@ -129,7 +129,7 @@ curl http://cupcakes.demos.kuadrant.io/baker/api
 ### Test the baker app after TLS configured
 
 ```sh
-curl http://cupcakes.demos.kuadrant.io/baker/api
+curl http://cupcakes.demos.kuadrant.io/baker
 # curl: (7) Failed to connect to cupcakes.demos.kuadrant.io port 80 after 7116 ms: Couldn't connect to server
 ```
 
@@ -157,7 +157,7 @@ kubectl get httproute/baker-route -n bakery-apps \
 ### Test the baker app hitting the HTTPS endpoint
 
 ```sh
-curl https://cupcakes.demos.kuadrant.io/baker/api
+curl https://cupcakes.demos.kuadrant.io/baker
 # curl: (60) SSL certificate problem: unable to get local issuer certificate
 # More details here: https://curl.se/docs/sslcerts.html
 #
@@ -169,7 +169,7 @@ curl https://cupcakes.demos.kuadrant.io/baker/api
 ### Bypass self-signed certificate verification by the client
 
 ```sh
-curl https://cupcakes.demos.kuadrant.io/baker/api --insecure
+curl https://cupcakes.demos.kuadrant.io/baker --insecure
 # 200
 ```
 
@@ -180,7 +180,7 @@ curl https://cupcakes.demos.kuadrant.io/baker/api --insecure
 ### Test the baker app behind the deny-all default auth policy
 
 ```sh
-curl https://cupcakes.demos.kuadrant.io/baker/api --insecure
+curl https://cupcakes.demos.kuadrant.io/baker --insecure
 # {
 #   "error": "Forbidden",
 #   "message": "Access denied by default by the gateway operator. If you are the administrator of the service, create a specific auth policy for the route."
@@ -223,14 +223,14 @@ spec:
     name: baker-route
   rules:
     authentication:
-      north-south: # external users
+      "bakers": # north-south
         jwt:
           issuerUrl: https://gitlab.com
         credentials:
           cookie:
             name: jwt
         priority: 1
-      east-west: # other pods inside the cluster
+      "apps": # east-west
         kubernetesTokenReview:
           audiences:
           - https://kubernetes.default.svc.cluster.local
@@ -239,13 +239,13 @@ spec:
             value: https://kubernetes.default.svc.cluster.local
         priority: 0
     authorization:
-      external-users:
+      "bakers":
         when:
         - predicate: auth.identity.iss == "https://gitlab.com"
         patternMatching:
           patterns:
           - predicate: '"evil-genius-cupcakes" in auth.identity.groups_direct'
-      pods:
+      "apps":
         when:
         - predicate: auth.identity.iss == "https://kubernetes.default.svc.cluster.local"
         patternMatching:
@@ -298,7 +298,7 @@ spec:
     name: oauth-route
   rules:
     metadata:
-      token:
+      "token":
         when:
         - predicate: request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1]).size() > 0
         http:
@@ -308,7 +308,7 @@ spec:
             expression: |
               "code=" + request.query.split("&").map(entry, entry.split("=")).filter(pair, pair[0] == "code").map(pair, pair[1])[0] + "&redirect_uri=https://cupcakes.demos.kuadrant.io/auth/callback&client_id=c0b3a4e52c5e60ccb40ccf7c9bd63828476cde4b71910beb463897069ce1ae29&grant_type=authorization_code"
     authorization:
-      location:
+      "location":
         opa:
           rego: |
             cookies := { name: value |
@@ -326,7 +326,7 @@ spec:
             allow = true
           allValues: true
         priority: 1
-      deny:
+      "deny":
         opa:
           rego: allow = false
         priority: 2

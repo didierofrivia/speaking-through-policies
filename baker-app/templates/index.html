@@ -8,17 +8,101 @@
 <body>
   <h1>Evil Genius Cupcakes</h1>
   <h2>Baking ovens dashboard</h2>
+
+  <button onclick="showCreateForm()">➕ Add Oven</button>
   <div class="oven-container">
     {% for oven in ovens %}
-      <div class="oven">
+      <div class="oven" id="oven-{{ oven.id }}" onclick="openEditModal({{ oven.id }}, '{{ oven.status }}', {{ oven.temperature or 0 }})">
         <h2>Oven {{ oven.id }}</h2>
         <div class="status-light {{ 'green' if oven.status == 'ON' else 'red' }}"></div>
         <p>Status: <strong>{{ oven.status }}</strong></p>
         {% if oven.temperature %}
           <p class="temperature">Temp: {{ oven.temperature }}°C</p>
         {% endif %}
+        <button onclick="event.stopPropagation(); deleteOven({{ oven.id }})">🗑 Delete</button>
       </div>
     {% endfor %}
   </div>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Edit Oven</h2>
+      <form id="editForm" onsubmit="submitEditForm(event)">
+        <input type="hidden" id="ovenId">
+        <label>Status:</label>
+        <select id="status">
+          <option value="ON">ON</option>
+          <option value="OFF">OFF</option>
+        </select><br>
+        <label>Temperature: <span id="tempValue"></span>°C</label><br>
+        <input type="range" min="100" max="300" id="temperature" oninput="updateTempLabel()"><br>
+        <button type="submit">💾 Save</button>
+        <button type="button" onclick="closeModal()">❌ Cancel</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let currentlyEditing = null;
+
+    function openEditModal(id, status, temp) {
+      document.getElementById("modal").classList.remove("hidden");
+      document.getElementById("ovenId").value = id;
+      document.getElementById("status").value = status;
+      document.getElementById("temperature").value = temp;
+      document.getElementById("tempValue").textContent = temp;
+
+      if (currentlyEditing) {
+        document.getElementById(`oven-${currentlyEditing}`)?.classList.remove("editing");
+      }
+      currentlyEditing = id;
+      document.getElementById(`oven-${id}`)?.classList.add("editing");
+    }
+
+    function updateTempLabel() {
+      const temp = document.getElementById("temperature").value;
+      document.getElementById("tempValue").textContent = temp;
+    }
+
+    function closeModal() {
+      document.getElementById("modal").classList.add("hidden");
+      if (currentlyEditing) {
+        document.getElementById(`oven-${currentlyEditing}`)?.classList.remove("editing");
+        currentlyEditing = null;
+      }
+    }
+
+    async function submitEditForm(event) {
+      event.preventDefault();
+      const id = document.getElementById("ovenId").value;
+      const status = document.getElementById("status").value;
+      const temp = parseInt(document.getElementById("temperature").value);
+      await fetch(`/baker/api/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: parseInt(id), status, temperature: temp })
+      });
+      location.reload();
+    }
+
+    async function deleteOven(id) {
+      if (!confirm(`Delete oven ${id}?`)) return;
+      await fetch(`/baker/api/${id}`, { method: "DELETE" });
+      location.reload();
+    }
+
+    async function showCreateForm() {
+      const id = prompt("New oven ID:");
+      if (!id) return;
+      const status = prompt("Status? (ON/OFF)", "OFF") || "OFF";
+      const temp = prompt("Temperature? (100-300)", "200") || "200";
+      await fetch("/baker/api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: parseInt(id), status, temperature: parseInt(temp) })
+      });
+      location.reload();
+    }
+  </script>
 </body>
 </html>

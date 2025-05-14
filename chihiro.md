@@ -5,6 +5,8 @@
 ### Login in to the cluster
 
 ```sh
+CHIHIRO_TOKEN=$(pbpaste)
+
 kubectl config set-credentials chihiro --token=$CHIHIRO_TOKEN
 kubectl config set-context chihiro --cluster=kind-evil-genius-cupcakes --user=chihiro --namespace=default
 alias kubectl="kubectl --context=chihiro"
@@ -38,8 +40,10 @@ kubectl create rolebinding bakery-dev-role-binding \
   --role=bakery-dev-role --serviceaccount=bakery-apps:ana -n bakery-apps
 ```
 
+Handover Ana's temporary access token:
+
 ```sh
-ANA_TOKEN=$(kubectl --context=chihiro create token ana -n bakery-apps --duration 8760h)
+kubectl --context=chihiro create token ana -n bakery-apps --duration 8760h | pbcopy
 ```
 
 <br/>
@@ -75,6 +79,11 @@ kubectl label namespace/bakery-apps apps=external
 ```
 
 Create a DNSPolicy:
+
+```sh
+export AWS_ACCESS_KEY_ID=<replace>
+export AWS_SECRET_ACCESS_KEY=<replace>
+```
 
 ```sh
 kubectl -n ingress-gateways create secret generic aws-credentials \

@@ -7,6 +7,12 @@
 kind create cluster --name=evil-genius-cupcakes
 ```
 
+### Preload container images (optional)
+
+```sh
+./hack/load-images.sh
+```
+
 ### Install cert-manager
 
 ```sh
@@ -97,6 +103,8 @@ kubectl create serviceaccount chihiro -n kube-system
 kubectl patch clusterrolebinding cluster-admin --type='json' -p='[{"op": "add", "path": "/subjects/-", "value": {"kind": "ServiceAccount", "name": "chihiro", "namespace": "kube-system"}}]'
 ```
 
+Handover Chihiro's temporary access token:
+
 ```sh
-CHIHIRO_TOKEN=$(kubectl create token chihiro -n kube-system --duration 8760h)
+kubectl create token chihiro -n kube-system --duration 8760h | pbcopy
 ```

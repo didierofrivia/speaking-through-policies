@@ -5,6 +5,8 @@
 ### Login to the cluster
 
 ```sh
+ANA_TOKEN=$(pbpaste)
+
 kubectl config set-credentials ana --token=$ANA_TOKEN
 kubectl config set-context ana --cluster=kind-evil-genius-cupcakes --user=ana --namespace=bakery-apps
 alias kubectl="kubectl --context=ana"
@@ -118,8 +120,15 @@ kubectl get gateway/bakery-apps -n ingress-gateways -o yaml | yq
 
 ### Test the baker app through the gateway
 
+In the browser:
+
+Open http://cupcakes.demos.kuadrant.io/baker in a browser
+
+In the terminal:
+
 ```sh
 curl http://cupcakes.demos.kuadrant.io/baker
+# 200
 ```
 
 <br/>

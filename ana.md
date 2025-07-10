@@ -243,6 +243,7 @@ spec:
         kubernetesTokenReview:
           audiences:
           - https://kubernetes.default.svc.cluster.local
+          - https://kubernetes.default.svc
         overrides:
           "iss":
             value: https://kubernetes.default.svc.cluster.local

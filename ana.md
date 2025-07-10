@@ -15,7 +15,7 @@ alias kubectl="kubectl --context=ana"
 ### Deploy the baker app
 
 ```sh
-kubectl apply -n bakery-apps -f - <<EOF
+kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -53,7 +53,7 @@ EOF
 ### Test the baker app within the cluster
 
 ```sh
-kubectl run curl -n bakery-apps --attach --rm --restart=Never -q --image=curlimages/curl --image-pull-policy=IfNotPresent -- http://baker:8000/baker -s
+kubectl run curl --attach --rm --restart=Never -q --image=curlimages/curl --image-pull-policy=IfNotPresent -- http://baker:8000/baker -s
 ```
 
 <br/>
@@ -70,7 +70,7 @@ kubectl get gateway/bakery-apps -n ingress-gateways -o jsonpath='{.status.condit
 ### Attach a route to the gateway
 
 ```sh
-kubectl apply -n bakery-apps -f - <<EOF
+kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -94,7 +94,7 @@ EOF
 ### Check the status of the route affected by a DNSPolicy
 
 ```sh
-kubectl get httproute/baker-route -n bakery-apps \
+kubectl get httproute/baker-route \
   -o jsonpath='{.status.parents[?(.controllerName=="kuadrant.io/policy-controller")]}' | jq
 
 # {
@@ -145,7 +145,7 @@ curl http://cupcakes.demos.kuadrant.io/baker
 ### Check the status of the route affected by a TLSPolicy
 
 ```sh
-kubectl get httproute/baker-route -n bakery-apps \
+kubectl get httproute/baker-route \
   -o jsonpath='{.status.parents[?(.controllerName=="kuadrant.io/policy-controller")]}' | jq
 
 # {
@@ -199,7 +199,7 @@ curl https://cupcakes.demos.kuadrant.io/baker --insecure
 ### Check the status of the route affected by an AuthPolicy
 
 ```sh
-kubectl get httproute/baker-route -n bakery-apps \
+kubectl get httproute/baker-route \
   -o jsonpath='{.status.parents[?(.controllerName=="kuadrant.io/policy-controller")]}' | jq
 
 # {
@@ -220,7 +220,7 @@ kubectl get httproute/baker-route -n bakery-apps \
 ### Define an AuthPolicy to replace the default deny-all one
 
 ```sh
-kubectl apply -n bakery-apps -f -<<EOF
+kubectl apply -f -<<EOF
 apiVersion: kuadrant.io/v1
 kind: AuthPolicy
 metadata:
@@ -243,6 +243,7 @@ spec:
         kubernetesTokenReview:
           audiences:
           - https://kubernetes.default.svc.cluster.local
+          - https://kubernetes.default.svc
         overrides:
           "iss":
             value: https://kubernetes.default.svc.cluster.local
@@ -370,7 +371,7 @@ kubectl get authpolicy/oauth -o yaml | yq
 #### Create a Service Account to identify another pod 'toppings'
 
 ```sh
-kubectl apply -n bakery-apps -f -<<EOF
+kubectl apply -f -<<EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -398,7 +399,7 @@ curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos.kuadrant.io
 ### Define a Rate Limit Policy for the baker app for a maximum of 5rp10s
 
 ```sh
-kubectl apply -n bakery-apps  -f -<<EOF
+kubectl apply -f -<<EOF
 apiVersion: kuadrant.io/v1
 kind: RateLimitPolicy
 metadata:
@@ -419,7 +420,7 @@ EOF
 ### Check the status of the route affected by a RateLimitPolicy
 
 ```sh
-kubectl get httproute/baker-route -n bakery-apps \
+kubectl get httproute/baker-route \
   -o jsonpath='{.status.parents[?(.controllerName=="kuadrant.io/policy-controller")]}' | jq
 
 # {
@@ -468,7 +469,7 @@ while :; do curl -H "Authorization: Bearer $POD_SA_TOKEN" https://cupcakes.demos
 ### Check the status of the route affected by another RateLimitPolicy
 
 ```sh
-kubectl get httproute/baker-route -n bakery-apps \
+kubectl get httproute/baker-route \
   -o jsonpath='{.status.parents[?(.controllerName=="kuadrant.io/policy-controller")]}' | jq
 
 # {
@@ -489,7 +490,7 @@ kubectl get httproute/baker-route -n bakery-apps \
 ### Check the status of the baker RateLimitPolicy overridden by the more restrictive policy
 
 ```sh
-kubectl get ratelimitpolicy/baker-rate-limit -n bakery-apps -o jsonpath='{.status.conditions[?(.type=="Enforced")]}' | jq
+kubectl get ratelimitpolicy/baker-rate-limit -o jsonpath='{.status.conditions[?(.type=="Enforced")]}' | jq
 # {
 #   "lastTransitionTime": "2025-03-19T11:09:17Z",
 #   "message": "RateLimitPolicy is overridden by [ingress-gateways/gateway-rate-limit]",

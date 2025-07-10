@@ -1,8 +1,8 @@
 # Speaking Through Policies
 
-Talk for the Cloud Native Barcelona Meetup (March 2025.)
-
-🔗 https://www.meetup.com/cloud-native-bcn/events/306257941/
+Talk for the [Cloud Native Computing Foundation (CNCF)](https://cncf.io) Community Groups:
+- Barcelona, Spain (March 2025) | 🔗 https://www.meetup.com/cloud-native-bcn/events/306257941/
+- Málaga, Spain (July 2025) | 🔗 https://community.cncf.io/events/details/cncf-malaga-presents-cloud-native-talks-speaking-through-policies/
 
 ## Description
 

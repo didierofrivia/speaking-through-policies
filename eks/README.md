@@ -14,21 +14,21 @@ The talk develops as a live demo play of the day-to-day interaction between 3 pe
 
 Continue to get acquainted with the personas and the tech. Click on each persona to see the corresponding steps and impersonate.
 
-If you prefer, a version of this demo is available to run on [Amazon Elastic Kubernetes Service (EKS)](eks/README.md).
+If you prefer, a version of this demo is available to run on [Kind](../README.md).
 
 ### Know the personas
 
 #### Ana: App Developer
 
-[![Ana](images/ana-intro.png)](ana.md)
+[![Ana](../images/ana-intro.png)](ana.md)
 
 #### Chihiro: Cluster Operator
 
-[![Chihiro](images/chihiro-intro.png)](chihiro.md)
+[![Chihiro](../images/chihiro-intro.png)](chihiro.md)
 
 #### Ian: Infrastructure Provider
 
-[![Ian](images/ian-intro.png)](ian.md)
+[![Ian](../images/ian-intro.png)](ian.md)
 
 Ref.: https://gateway-api.sigs.k8s.io/concepts/roles-and-personas
 
@@ -39,17 +39,15 @@ Ref.: https://gateway-api.sigs.k8s.io/concepts/roles-and-personas
 - [Envoy Gateway](https://gateway.envoyproxy.io/)
 - [Kuadrant](https://kuadrant.io/)
 - [cert-manager](https://cert-manager.io/)
-- [MetalLB](https://metallb.org/)
 - [Amazon Route 53 Cloud DNS Service](https://aws.amazon.com/route53/)
+- [AWS Load Balancer Controller](https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/)
 
 ### Requisites & Tweaks
 
 To run the demo, you need the following tools installed on your system:
 
-- [Podman](https://podman.io/)
-- [Podman Mac Net Connect](https://github.com/jasonmadigan/podman-mac-net-connect) (macOS only)
+- [aws](https://aws.amazon.com/cli/)
 - [kubectl](https://kubernetes.io/docs/reference/kubectl/introduction/)
-- [Kind](https://kind.sigs.k8s.io/)
 - [Helm](https://helm.sh/)
 - [curl](https://curl.se/)
 - [jq](https://jqlang.org/)
@@ -57,6 +55,7 @@ To run the demo, you need the following tools installed on your system:
 
 You will also need:
 
+- A Kubernetes cluster | We are using [Amazon Elastic Kubernetes Service (EKS)](https://aws.amazon.com/eks)
 - AWS Access key with permission to manage hosted managed zones in Route53
 
 Export the credentials as the `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` shell variables.

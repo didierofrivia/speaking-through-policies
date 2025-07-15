@@ -79,6 +79,7 @@ EOF
 ```sh
 helm repo add kuadrant https://kuadrant.io/helm-charts/ --force-update
 helm install kuadrant-operator kuadrant/kuadrant-operator \
+  --version 1.3.0-alpha1\
   --namespace kuadrant-system \
   --create-namespace \
   --wait
